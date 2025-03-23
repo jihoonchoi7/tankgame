@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import Link from 'next/link';
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
   subsets: ["latin"],
+  variable: "--font-geist-sans",
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
   subsets: ["latin"],
+  variable: "--font-geist-mono",
 });
 
 export const metadata: Metadata = {
@@ -19,15 +20,41 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}>
+        <header className="bg-gray-900 text-white py-4">
+          <div className="container mx-auto flex justify-between items-center px-4">
+            <Link href="/" className="text-xl font-bold">
+              Tank Game
+            </Link>
+            <nav>
+              <ul className="flex space-x-6">
+                <li>
+                  <Link href="/" className="hover:text-gray-300">
+                    Home
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/game" className="hover:text-gray-300">
+                    Play Game
+                  </Link>
+                </li>
+              </ul>
+            </nav>
+          </div>
+        </header>
+        
+        <main className="flex-grow">
+          {children}
+        </main>
+        
+        <footer className="bg-gray-900 text-white py-4 text-center">
+          <p>Tank Game - Created with Three.js and Next.js</p>
+        </footer>
       </body>
     </html>
   );
