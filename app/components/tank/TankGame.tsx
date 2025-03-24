@@ -15,7 +15,7 @@ function Projectile({ id, initialPosition, direction, onRemove }: {
   direction: [number, number, number];
   onRemove: (id: number) => void;
 }) {
-  const meshRef = useRef<THREE.Mesh>(null);
+  const groupRef = useRef<THREE.Group>(null);
   const position = useRef(new THREE.Vector3(...initialPosition));
   const dir = useRef(new THREE.Vector3(...direction).normalize());
   const speed = 0.5; // Units per frame
@@ -30,21 +30,49 @@ function Projectile({ id, initialPosition, direction, onRemove }: {
   }, [id, onRemove]);
   
   useFrame((state, delta) => {
-    if (!meshRef.current) return;
+    if (!groupRef.current) return;
     
     // Update position along direction vector
     position.current.addScaledVector(dir.current, speed);
     
     // Apply to mesh
-    meshRef.current.position.copy(position.current);
+    groupRef.current.position.copy(position.current);
+    
+    // Orient the shell in the direction of travel
+    if (dir.current) {
+      // Create a rotation that orients the shell along its trajectory
+      const shellDirection = new THREE.Vector3(0, 0, 1);
+      groupRef.current.quaternion.setFromUnitVectors(shellDirection, dir.current);
+    }
   });
   
   return (
-    <mesh ref={meshRef} position={initialPosition}>
-      <sphereGeometry args={[0.2, 16, 16]} />
-      <meshStandardMaterial emissive="red" emissiveIntensity={2} />
-      <pointLight intensity={5} distance={3} color="red" />
-    </mesh>
+    <group ref={groupRef} position={initialPosition}>
+      {/* Shell body - main cylindrical part */}
+      <mesh castShadow receiveShadow position={[0, 0, 0]}>
+        <cylinderGeometry args={[0.1, 0.1, 0.5, 12]} />
+        <meshStandardMaterial color="#b8860b" roughness={0.2} metalness={0.8} />
+      </mesh>
+      
+      {/* Shell tip - conical part */}
+      <mesh castShadow receiveShadow position={[0, 0, 0.25]}>
+        <coneGeometry args={[0.1, 0.3, 12]} />
+        <meshStandardMaterial color="#cd7f32" roughness={0.3} metalness={0.7} />
+      </mesh>
+      
+      {/* Shell base - slight protrusion */}
+      <mesh castShadow receiveShadow position={[0, 0, -0.25]}>
+        <cylinderGeometry args={[0.11, 0.11, 0.05, 12]} />
+        <meshStandardMaterial color="#8b4513" roughness={0.4} metalness={0.6} />
+      </mesh>
+      
+      {/* Tracer effect */}
+      <pointLight intensity={2} distance={5} color="orange" />
+      <mesh position={[0, 0, -0.4]}>
+        <sphereGeometry args={[0.05, 8, 8]} />
+        <meshStandardMaterial emissive="orange" emissiveIntensity={2} transparent opacity={0.8} />
+      </mesh>
+    </group>
   );
 }
 

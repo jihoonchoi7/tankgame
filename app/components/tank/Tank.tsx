@@ -87,11 +87,11 @@ export default function Tank({
           .applyEuler(rotationRef.current)
           .normalize();
         
-        // Start projectile a bit in front of the turret
+        // Start projectile a bit in front of the turret barrel
         const projectilePosition: [number, number, number] = [
-          turretWorldPosition.x + direction.x * 2.5,
-          turretWorldPosition.y + 0.5, // Slight height adjustment
-          turretWorldPosition.z + direction.z * 2.5
+          turretWorldPosition.x + direction.x * 3.3,  // Adjusted to match barrel end
+          turretWorldPosition.y + 0.25,               // Match barrel height
+          turretWorldPosition.z + direction.z * 3.3   // Adjusted to match barrel end
         ];
         
         onShoot(projectilePosition, [direction.x, direction.y, direction.z]);
