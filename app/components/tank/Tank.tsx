@@ -31,7 +31,7 @@ export default function Tank({
 }: TankProps) {
   const tankRef = useRef<THREE.Group>(null);
   const turretRef = useRef<THREE.Group>(null);
-  const positionRef = useRef(new THREE.Vector3(...position));
+  const positionRef = useRef(new THREE.Vector3(position[0], 0.5, position[2]));
   const rotationRef = useRef(new THREE.Euler(0, 0, 0));
   const shootTimeRef = useRef(0);
   
@@ -52,14 +52,14 @@ export default function Tank({
       positionRef.current.z -= Math.cos(rotationRef.current.y) * MOVE_SPEED;
     }
     
-    // Tank strafing
+    // Tank strafing - Fixed to match A = left, D = right from camera perspective
     if (moveLeft) {
-      positionRef.current.x -= Math.cos(rotationRef.current.y) * MOVE_SPEED;
-      positionRef.current.z += Math.sin(rotationRef.current.y) * MOVE_SPEED;
-    }
-    if (moveRight) {
       positionRef.current.x += Math.cos(rotationRef.current.y) * MOVE_SPEED;
       positionRef.current.z -= Math.sin(rotationRef.current.y) * MOVE_SPEED;
+    }
+    if (moveRight) {
+      positionRef.current.x -= Math.cos(rotationRef.current.y) * MOVE_SPEED;
+      positionRef.current.z += Math.sin(rotationRef.current.y) * MOVE_SPEED;
     }
     
     // Tank rotation
@@ -100,7 +100,12 @@ export default function Tank({
   });
   
   return (
-    <group ref={tankRef} position={position} castShadow receiveShadow>
+    <group 
+      ref={tankRef} 
+      position={[position[0], 0.5, position[2]]} 
+      castShadow 
+      receiveShadow
+    >
       <TankBody />
       <TankTurret ref={turretRef} />
     </group>
