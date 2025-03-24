@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { PerspectiveCamera, OrbitControls, Sky, Environment, Cloud as DreiCloud, useGLTF } from "@react-three/drei";
 import Tank from "./Tank";
-import Ground from "../Ground";
+import TerrainGround, { TerrainFunctions } from "../TerrainGround";
 import { useControls } from "../../utils/useControls";
 import * as THREE from "three";
 import { Suspense } from "react";
+import { Vector3 } from "three";
 
 // Custom Cloud component with correct types
 function CustomCloud({ position, args, speed, opacity }: { 
@@ -19,10 +20,41 @@ function CustomCloud({ position, args, speed, opacity }: {
   return (
     <DreiCloud 
       position={position} 
-      args={args as any} // Type casting because args has a different expected type
+      args={args as any}
       speed={speed as any} 
       opacity={opacity as any} 
     />
+  );
+}
+
+// NEW: Camera controller component that handles following the tank
+function CameraController({ tankPosition }: { tankPosition: Vector3 }) {
+  const controlsRef = useRef<any>(null);
+  
+  // This useFrame is now safely inside a component rendered within the Canvas
+  useFrame((state, delta) => {
+    if (!controlsRef.current) return;
+    
+    // Update orbit controls target to follow tank
+    const controls = controlsRef.current;
+    
+    // Smoothly interpolate the camera target position
+    controls.target.lerp(tankPosition, 0.05);
+    controls.update();
+  });
+  
+  return (
+    <>
+      <PerspectiveCamera makeDefault position={[0, 20, -20]} />
+      <OrbitControls 
+        ref={controlsRef}
+        maxPolarAngle={Math.PI / 2} 
+        minDistance={10} 
+        maxDistance={50}
+        enableDamping={true}
+        dampingFactor={0.1}
+      />
+    </>
   );
 }
 
@@ -189,6 +221,11 @@ function Birds() {
 export default function TankGame() {
   const [projectiles, setProjectiles] = useState<Array<{ id: number; position: [number, number, number]; direction: [number, number, number] }>>([]);
   const projectileIdRef = useRef(0);
+  const [terrainFunctions, setTerrainFunctions] = useState<TerrainFunctions>({
+    getTerrainHeight: () => 0,
+    getTerrainNormal: () => new THREE.Vector3(0, 1, 0),
+    isInWater: () => false
+  });
   
   const { moveForward, moveBackward, moveLeft, moveRight, rotateLeft, rotateRight, shoot } = useControls();
   
@@ -204,7 +241,19 @@ export default function TankGame() {
   const removeProjectile = (id: number) => {
     setProjectiles((prev) => prev.filter((p) => p.id !== id));
   };
+  
+  const handleTerrainUpdate = (functions: TerrainFunctions) => {
+    setTerrainFunctions(functions);
+  };
 
+  // Tank position tracking
+  const tankPositionRef = useRef(new Vector3(0, 0, 0));
+  
+  // Update the tank's position when it moves
+  const updateTankPosition = (x: number, y: number, z: number) => {
+    tankPositionRef.current.set(x, y, z);
+  };
+  
   return (
     <div className="w-full h-full">
       <Suspense fallback={
@@ -223,8 +272,9 @@ export default function TankGame() {
         </div>
       }>
         <Canvas shadows>
-          <PerspectiveCamera makeDefault position={[0, 20, -20]} />
-          <OrbitControls maxPolarAngle={Math.PI / 2} minDistance={10} maxDistance={50} />
+          {/* Camera controller is now inside the Canvas */}
+          <CameraController tankPosition={tankPositionRef.current} />
+          
           <ambientLight intensity={0.5} />
           <directionalLight
             castShadow
@@ -254,7 +304,8 @@ export default function TankGame() {
           <Birds />
           <Environment preset="sunset" />
           
-          {/* Main Game Elements */}
+          {/* Main Game Elements with Terrain */}
+          <TerrainGround onHeightUpdate={handleTerrainUpdate} />
           <Tank 
             position={[0, 0, 0]}
             moveForward={moveForward}
@@ -265,6 +316,10 @@ export default function TankGame() {
             rotateRight={rotateRight}
             shoot={shoot}
             onShoot={handleShoot}
+            getTerrainHeight={terrainFunctions.getTerrainHeight}
+            getTerrainNormal={terrainFunctions.getTerrainNormal}
+            isInWater={terrainFunctions.isInWater}
+            onMove={updateTankPosition}
           />
           
           {/* Render projectiles */}
@@ -277,8 +332,6 @@ export default function TankGame() {
               onRemove={removeProjectile}
             />
           ))}
-          
-          <Ground />
         </Canvas>
       </Suspense>
     </div>
