@@ -20,6 +20,7 @@ interface TankProps {
   getTerrainHeight?: (x: number, z: number) => number;
   getTerrainNormal?: (x: number, z: number) => THREE.Vector3;
   onMove?: (x: number, y: number, z: number) => void;
+  onRotationChange?: (rotation: number) => void;
 }
 
 export default function Tank({ 
@@ -35,6 +36,7 @@ export default function Tank({
   getTerrainHeight = () => 0,
   getTerrainNormal = () => new THREE.Vector3(0, 1, 0),
   onMove = () => {},
+  onRotationChange = () => {},
 }: TankProps) {
   const tankRef = useRef<THREE.Group>(null);
   const turretRef = useRef<THREE.Group>(null);
@@ -167,6 +169,9 @@ export default function Tank({
     if (rotateRight) {
       rotationRef.current.y -= frameAdjustedRotSpeed;
     }
+    
+    // Notify parent component about rotation changes
+    onRotationChange(rotationRef.current.y);
     
     // Apply position and basic rotation
     tankRef.current.position.copy(positionRef.current);

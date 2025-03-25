@@ -25,6 +25,9 @@ export default function TankGame() {
   
   const { moveForward, moveBackward, moveLeft, moveRight, rotateLeft, rotateRight, shoot } = useControls();
   
+  // Add state for tank rotation
+  const [tankRotation, setTankRotation] = useState(0);
+  
   const handleShoot = (position: [number, number, number], direction: [number, number, number]) => {
     const newProjectile = {
       id: projectileIdRef.current++,
@@ -72,6 +75,7 @@ export default function TankGame() {
             getTerrainHeight={terrainFunctions.getTerrainHeight}
             getTerrainNormal={terrainFunctions.getTerrainNormal}
             onMove={updateTankPosition}
+            onRotationChange={(rotation) => setTankRotation(rotation)}
           />
           
           {/* Projectiles */}
@@ -88,7 +92,8 @@ export default function TankGame() {
         
         {/* Camera controller follows the tank */}
         <CameraController 
-          tankPosition={tankPositionRef.current} 
+          tankPosition={tankPositionRef.current}
+          tankRotation={tankRotation}
           getTerrainHeight={terrainFunctions.getTerrainHeight}
         />
         
