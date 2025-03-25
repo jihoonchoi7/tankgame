@@ -29,17 +29,23 @@ export default function Projectile({
   const [trailUpdated, setTrailUpdated] = useState(0);
   // Add maximum trail length as a constant
   const MAX_TRAIL_LENGTH = 10;
+  // Add circular buffer tracking variables
+  const bufferIndexRef = useRef(0);
+  const bufferSizeRef = useRef(0);
   // Add a ref for the instanced mesh
   const trailMeshRef = useRef<THREE.InstancedMesh>(null);
   // Add a temporary matrix for updating instance transforms
   const tempMatrix = useRef(new THREE.Matrix4());
   // Add a vector pool for reusing Vector3 objects
   const vectorPoolRef = useRef<THREE.Vector3[]>(
-    Array(MAX_TRAIL_LENGTH + 1).fill(0).map(() => new THREE.Vector3())
+    Array(MAX_TRAIL_LENGTH).fill(0).map(() => new THREE.Vector3())
   );
   const poolIndexRef = useRef(0);
   
   useEffect(() => {
+    // Initialize the trail positions array with empty vectors
+    trailPositionsRef.current = Array(MAX_TRAIL_LENGTH).fill(0).map(() => new THREE.Vector3());
+    
     // Remove projectile after lifetime expires
     const timer = setTimeout(() => {
       onRemove(id);
@@ -55,19 +61,24 @@ export default function Projectile({
     position.current.addScaledVector(dir.current, speed);
     
     // Get a vector from the pool and set its value
+    // Limit the poolIndex to prevent potential overflow after long runtime
     const poolIndex = poolIndexRef.current % vectorPoolRef.current.length;
     const trailPosition = vectorPoolRef.current[poolIndex];
     trailPosition.copy(position.current);
-    poolIndexRef.current++;
+    // Reset the counter to prevent overflow
+    poolIndexRef.current = (poolIndexRef.current + 1) % MAX_TRAIL_LENGTH;
     
-    // Add the vector from pool to trail positions
-    const newPositions = [...trailPositionsRef.current, trailPosition];
-    if (newPositions.length > MAX_TRAIL_LENGTH) newPositions.shift();
-    trailPositionsRef.current = newPositions;
+    // Implement circular buffer pattern for trail positions
+    bufferIndexRef.current = (bufferIndexRef.current + 1) % MAX_TRAIL_LENGTH;
+    trailPositionsRef.current[bufferIndexRef.current].copy(position.current);
+    bufferSizeRef.current = Math.min(bufferSizeRef.current + 1, MAX_TRAIL_LENGTH);
     
     // Update instanced mesh positions and scales
     if (trailMeshRef.current) {
-      trailPositionsRef.current.forEach((_, i) => {
+      for (let i = 0; i < bufferSizeRef.current; i++) {
+        // Calculate the actual index in the circular buffer
+        const actualIndex = (bufferIndexRef.current - i + MAX_TRAIL_LENGTH) % MAX_TRAIL_LENGTH;
+        
         // Reset the matrix
         tempMatrix.current.identity();
         
@@ -80,13 +91,13 @@ export default function Projectile({
         
         // Apply the matrix to this instance
         trailMeshRef.current?.setMatrixAt(i, tempMatrix.current);
-      });
+      }
       
       // Important! Flag the instanceMatrix as needing an update
       trailMeshRef.current.instanceMatrix.needsUpdate = true;
       
       // Update the count to match our current trail length
-      trailMeshRef.current.count = trailPositionsRef.current.length;
+      trailMeshRef.current.count = bufferSizeRef.current;
     }
     
     // Occasionally update the state to trigger re-renders
