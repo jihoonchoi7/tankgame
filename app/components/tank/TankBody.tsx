@@ -8,21 +8,21 @@ export default function TankBody() {
   const meshRef = useRef<THREE.Group>(null);
   
   return (
-    <group ref={meshRef} position={[0, 0.5, 0]}>
-      {/* Main body */}
+    <group ref={meshRef} position={[0, 0.4, 0]}>
+      {/* Main body - adjusted position */}
       <mesh castShadow receiveShadow>
         <boxGeometry args={[2, 0.8, 3]} />
         <meshStandardMaterial color="#566d7c" roughness={0.5} metalness={0.7} />
       </mesh>
       
-      {/* Tank treads left */}
-      <mesh position={[-1.1, -0.3, 0]} castShadow receiveShadow>
+      {/* Tank treads left - lowered to ensure they touch the ground */}
+      <mesh position={[-1.1, -0.65, 0]} castShadow receiveShadow>
         <boxGeometry args={[0.4, 0.5, 3.6]} />
         <meshStandardMaterial color="#333333" roughness={0.9} metalness={0.1} />
       </mesh>
       
-      {/* Tank treads right */}
-      <mesh position={[1.1, -0.3, 0]} castShadow receiveShadow>
+      {/* Tank treads right - lowered to ensure they touch the ground */}
+      <mesh position={[1.1, -0.65, 0]} castShadow receiveShadow>
         <boxGeometry args={[0.4, 0.5, 3.6]} />
         <meshStandardMaterial color="#333333" roughness={0.9} metalness={0.1} />
       </mesh>
@@ -39,9 +39,9 @@ export default function TankBody() {
         <meshStandardMaterial color="#3a4a55" roughness={0.6} metalness={0.8} />
       </mesh>
       
-      {/* Small wheels between tracks (decorative) */}
+      {/* Small wheels between tracks (decorative) - adjusted position to match treads */}
       {[-1.2, -0.7, 0, 0.7, 1.2].map((z, i) => (
-        <group key={i} position={[0, -0.4, z]}>
+        <group key={i} position={[0, -0.75, z]}>
           <mesh position={[-1.3, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
             <cylinderGeometry args={[0.2, 0.2, 0.2, 16]} />
             <meshStandardMaterial color="#222222" roughness={0.7} metalness={0.3} />

@@ -16,10 +16,9 @@ interface TankProps {
   rotateRight: boolean;
   shoot: boolean;
   onShoot: (position: [number, number, number], direction: [number, number, number]) => void;
-  // New terrain-related props
+  // Terrain-related props
   getTerrainHeight?: (x: number, z: number) => number;
   getTerrainNormal?: (x: number, z: number) => THREE.Vector3;
-  isInWater?: (x: number, z: number) => boolean;
   onMove?: (x: number, y: number, z: number) => void;
 }
 
@@ -35,7 +34,6 @@ export default function Tank({
   onShoot,
   getTerrainHeight = () => 0,
   getTerrainNormal = () => new THREE.Vector3(0, 1, 0),
-  isInWater = () => false,
   onMove = () => {},
 }: TankProps) {
   const tankRef = useRef<THREE.Group>(null);
@@ -44,193 +42,228 @@ export default function Tank({
   const rotationRef = useRef(new THREE.Euler(0, 0, 0));
   const shootTimeRef = useRef(0);
   
-  // State to track if tank is in water
-  const [inWater, setInWater] = useState(false);
-  const waterTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const waterWarningRef = useRef(false);
+  // Previous values for smoothing
+  const prevNormalRef = useRef(new THREE.Vector3(0, 1, 0));
+  const prevHeightRef = useRef(0);
+  const stabilityCounterRef = useRef(0);
+  const [recoveryMode, setRecoveryMode] = useState(false);
   
+  // Constants with tweaked values
   const MOVE_SPEED = 0.1;
   const ROTATION_SPEED = 0.02;
   const SHOOT_COOLDOWN = 400; // ms
-  const MAX_WATER_TIME = 5000; // ms - time before water damage
-  const WATER_WARNING_TIME = 3000; // ms - time when warning starts
+  const MAX_SLOPE_DOT = 0.4; // Lower value = can climb steeper slopes
+  const SAMPLE_DISTANCE = 1.2; // Reduced from 1.5 for more precise readings
+  const ROTATION_SMOOTHING = 0.04; // Reduced for more gradual changes
+  const HEIGHT_SMOOTHING = 0.03; // Very gradual height changes
+  const STABILITY_THRESHOLD = 30; // Frames before exiting recovery mode
   
-  // Water warning effect
+  // Initialize tank at the correct terrain height
   useEffect(() => {
-    // Cleanup function to clear any timers
-    return () => {
-      if (waterTimerRef.current) {
-        clearTimeout(waterTimerRef.current);
-      }
-    };
-  }, []);
-  
-  // Add a UI element for water warning that gets displayed when appropriate
-  useEffect(() => {
-    // Create or update water warning element
-    const warningId = 'water-warning';
-    let warningElement = document.getElementById(warningId);
-    
-    if (!warningElement) {
-      warningElement = document.createElement('div');
-      warningElement.id = warningId;
-      warningElement.style.position = 'absolute';
-      warningElement.style.top = '20%';
-      warningElement.style.left = '50%';
-      warningElement.style.transform = 'translate(-50%, -50%)';
-      warningElement.style.color = 'red';
-      warningElement.style.fontWeight = 'bold';
-      warningElement.style.fontSize = '24px';
-      warningElement.style.textShadow = '2px 2px 4px rgba(0, 0, 0, 0.5)';
-      warningElement.style.display = 'none';
-      warningElement.style.zIndex = '1000';
-      warningElement.style.fontFamily = 'Arial, sans-serif';
-      warningElement.style.padding = '10px';
-      warningElement.style.borderRadius = '5px';
-      warningElement.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-      warningElement.innerText = 'WARNING: Tank in water! Exit immediately!';
-      document.body.appendChild(warningElement);
+    if (tankRef.current) {
+      const initialHeight = getTerrainHeight(position[0], position[2]);
+      positionRef.current.set(position[0], initialHeight + 0.25, position[2]);
+      prevHeightRef.current = initialHeight + 0.25;
+      tankRef.current.position.copy(positionRef.current);
     }
-    
-    // Clean up element on component unmount
-    return () => {
-      if (warningElement && warningElement.parentNode) {
-        warningElement.parentNode.removeChild(warningElement);
-      }
-    };
   }, []);
-  
-  // Update water warning visibility
-  useEffect(() => {
-    const warningElement = document.getElementById('water-warning');
-    if (warningElement) {
-      warningElement.style.display = waterWarningRef.current ? 'block' : 'none';
-      
-      // Add flashing effect when warning is active
-      if (waterWarningRef.current) {
-        let visible = true;
-        const flashInterval = setInterval(() => {
-          visible = !visible;
-          warningElement.style.visibility = visible ? 'visible' : 'hidden';
-        }, 500);
-        
-        return () => clearInterval(flashInterval);
-      }
-    }
-  }, [waterWarningRef.current]);
   
   useFrame((state, delta) => {
     if (!tankRef.current) return;
     
-    // Get current position for terrain sampling
-    const currentX = positionRef.current.x;
-    const currentZ = positionRef.current.z;
-    
-    // Check if tank is in water
-    const inWaterNow = isInWater(currentX, currentZ);
-    
-    // Handle water warning and timer
-    if (inWaterNow !== inWater) {
-      setInWater(inWaterNow);
-      
-      if (inWaterNow) {
-        // Start water timer if entering water
-        waterTimerRef.current = setTimeout(() => {
-          // Reset tank position if in water too long
-          positionRef.current.set(0, 0.5, 0);
-          rotationRef.current.set(0, 0, 0);
-          
-          // Reset water warnings
-          waterWarningRef.current = false;
-          const warningElement = document.getElementById('water-warning');
-          if (warningElement) {
-            warningElement.style.display = 'none';
-          }
-        }, MAX_WATER_TIME);
-        
-        // Set a timer for showing warning
-        setTimeout(() => {
-          if (inWater) {
-            waterWarningRef.current = true;
-          }
-        }, WATER_WARNING_TIME);
-      } else if (waterTimerRef.current) {
-        // Clear water timer if exiting water
-        clearTimeout(waterTimerRef.current);
-        waterTimerRef.current = null;
-        waterWarningRef.current = false;
-      }
-    }
+    // Adjust delta to prevent extreme values during frame drops
+    const clampedDelta = Math.min(delta, 0.1);
     
     // Calculate new position based on controls
     const newPos = positionRef.current.clone();
     
+    // Make speed frame-rate independent
+    const frameAdjustedMoveSpeed = MOVE_SPEED * clampedDelta * 60;
+    const frameAdjustedRotSpeed = ROTATION_SPEED * clampedDelta * 60;
+    
     // Movement direction based on tank rotation
     if (moveForward) {
-      newPos.x += Math.sin(rotationRef.current.y) * MOVE_SPEED;
-      newPos.z += Math.cos(rotationRef.current.y) * MOVE_SPEED;
+      newPos.x += Math.sin(rotationRef.current.y) * frameAdjustedMoveSpeed;
+      newPos.z += Math.cos(rotationRef.current.y) * frameAdjustedMoveSpeed;
     }
     if (moveBackward) {
-      newPos.x -= Math.sin(rotationRef.current.y) * MOVE_SPEED;
-      newPos.z -= Math.cos(rotationRef.current.y) * MOVE_SPEED;
+      newPos.x -= Math.sin(rotationRef.current.y) * frameAdjustedMoveSpeed;
+      newPos.z -= Math.cos(rotationRef.current.y) * frameAdjustedMoveSpeed;
     }
     
     // Tank strafing - Fixed to match A = left, D = right from camera perspective
     if (moveLeft) {
-      newPos.x += Math.cos(rotationRef.current.y) * MOVE_SPEED;
-      newPos.z -= Math.sin(rotationRef.current.y) * MOVE_SPEED;
+      newPos.x += Math.cos(rotationRef.current.y) * frameAdjustedMoveSpeed;
+      newPos.z -= Math.sin(rotationRef.current.y) * frameAdjustedMoveSpeed;
     }
     if (moveRight) {
-      newPos.x -= Math.cos(rotationRef.current.y) * MOVE_SPEED;
-      newPos.z += Math.sin(rotationRef.current.y) * MOVE_SPEED;
+      newPos.x -= Math.cos(rotationRef.current.y) * frameAdjustedMoveSpeed;
+      newPos.z += Math.sin(rotationRef.current.y) * frameAdjustedMoveSpeed;
     }
     
-    // Get terrain height at new position
-    const terrainHeight = getTerrainHeight(newPos.x, newPos.z);
+    // Calculate terrain heights at multiple points around the tank for better sampling
+    const centerHeight = getTerrainHeight(newPos.x, newPos.z);
     
-    // Ensure the tank is properly positioned above terrain with a fixed offset
-    newPos.y = terrainHeight + 1.0; // Increased to 1.0 to prevent sinking
+    // Sample heights in forward, backward, left, right and diagonals for better coverage
+    const forwardVec = new THREE.Vector3(Math.sin(rotationRef.current.y), 0, Math.cos(rotationRef.current.y));
+    const rightVec = new THREE.Vector3(Math.cos(rotationRef.current.y), 0, -Math.sin(rotationRef.current.y));
+    
+    const frontHeight = getTerrainHeight(
+      newPos.x + forwardVec.x * SAMPLE_DISTANCE,
+      newPos.z + forwardVec.z * SAMPLE_DISTANCE
+    );
+    
+    const backHeight = getTerrainHeight(
+      newPos.x - forwardVec.x * SAMPLE_DISTANCE,
+      newPos.z - forwardVec.z * SAMPLE_DISTANCE
+    );
+    
+    const leftHeight = getTerrainHeight(
+      newPos.x - rightVec.x * SAMPLE_DISTANCE,
+      newPos.z - rightVec.z * SAMPLE_DISTANCE
+    );
+    
+    const rightHeight = getTerrainHeight(
+      newPos.x + rightVec.x * SAMPLE_DISTANCE,
+      newPos.z + rightVec.z * SAMPLE_DISTANCE
+    );
+    
+    // Use the highest point to ensure no part of the tank sinks into terrain
+    const highestPoint = Math.max(centerHeight, frontHeight, backHeight, leftHeight, rightHeight);
+    
+    // Smoothly interpolate to the new height with a very gradual rate
+    const targetHeight = highestPoint + 0.25; // Offset for treads
+    
+    // Apply significant damping to height changes
+    let heightLerpFactor = HEIGHT_SMOOTHING * clampedDelta * 60;
+    heightLerpFactor = Math.min(heightLerpFactor, 0.05); // Cap even with high delta
+    
+    // Even more gradual during recovery mode
+    if (recoveryMode) {
+      heightLerpFactor *= 0.5;
+    }
+    
+    // Calculate new height with damping
+    newPos.y = THREE.MathUtils.lerp(positionRef.current.y, targetHeight, heightLerpFactor);
+    
+    // Detect sudden large changes in height and smooth them further
+    const heightDelta = Math.abs(newPos.y - prevHeightRef.current);
+    if (heightDelta > 0.5 && !recoveryMode) {
+      // If sudden jump detected, use even smaller step
+      newPos.y = THREE.MathUtils.lerp(prevHeightRef.current, newPos.y, 0.1);
+      setRecoveryMode(true);
+      stabilityCounterRef.current = 0;
+    }
+    
+    prevHeightRef.current = newPos.y;
     
     // Update position
     positionRef.current.copy(newPos);
     
-    // Tank rotation
+    // Tank rotation with frame-rate independence
     if (rotateLeft) {
-      rotationRef.current.y += ROTATION_SPEED;
+      rotationRef.current.y += frameAdjustedRotSpeed;
     }
     if (rotateRight) {
-      rotationRef.current.y -= ROTATION_SPEED;
+      rotationRef.current.y -= frameAdjustedRotSpeed;
     }
     
     // Apply position and basic rotation
     tankRef.current.position.copy(positionRef.current);
-    tankRef.current.rotation.y = rotationRef.current.y;
     
-    // Adjust tank orientation to match terrain slope
-    if (tankRef.current) {
-      // Get terrain normal at current position for slope alignment
-      const normal = getTerrainNormal(positionRef.current.x, positionRef.current.z);
-      
-      // Create a rotation to align the tank with the terrain normal
-      if (normal && normal.y > 0.5) { // Only align if normal is valid and not too steep
-        // Create rotation to align tank with terrain slope
-        const alignQuat = new THREE.Quaternion().setFromUnitVectors(
-          new THREE.Vector3(0, 1, 0), // Up vector
-          normal // Terrain normal
-        );
-        
-        // Combine the Y-rotation (tank direction) with the terrain alignment
-        const yRotation = new THREE.Quaternion().setFromEuler(
-          new THREE.Euler(0, rotationRef.current.y, 0)
-        );
-        
-        // Apply combined rotation: first align to terrain, then apply Y rotation
-        const finalRotation = new THREE.Quaternion()
-          .multiplyQuaternions(yRotation, alignQuat);
-        
-        // Apply the rotation
-        tankRef.current.quaternion.copy(finalRotation);
+    // Sample terrain normals at multiple points around the tank
+    const normalCenter = getTerrainNormal(newPos.x, newPos.z);
+    const normalFront = getTerrainNormal(
+      newPos.x + forwardVec.x * SAMPLE_DISTANCE,
+      newPos.z + forwardVec.z * SAMPLE_DISTANCE
+    );
+    const normalBack = getTerrainNormal(
+      newPos.x - forwardVec.x * SAMPLE_DISTANCE,
+      newPos.z - forwardVec.z * SAMPLE_DISTANCE
+    );
+    const normalLeft = getTerrainNormal(
+      newPos.x - rightVec.x * SAMPLE_DISTANCE,
+      newPos.z - rightVec.z * SAMPLE_DISTANCE
+    );
+    const normalRight = getTerrainNormal(
+      newPos.x + rightVec.x * SAMPLE_DISTANCE,
+      newPos.z + rightVec.z * SAMPLE_DISTANCE
+    );
+    
+    // Check all normals for validity and replace invalid ones with default
+    const defaultNormal = new THREE.Vector3(0, 1, 0);
+    
+    const validateNormal = (normal: THREE.Vector3) => {
+      if (isNaN(normal.x) || isNaN(normal.y) || isNaN(normal.z) || 
+          normal.lengthSq() < 0.1) {
+        return defaultNormal.clone();
       }
+      return normal;
+    };
+    
+    const validCenter = validateNormal(normalCenter);
+    const validFront = validateNormal(normalFront);
+    const validBack = validateNormal(normalBack);
+    const validLeft = validateNormal(normalLeft);
+    const validRight = validateNormal(normalRight);
+    
+    // Enhanced weighted average with additional sample points
+    const blendedNormal = new THREE.Vector3()
+      .addScaledVector(validCenter, 0.6)
+      .addScaledVector(validFront, 0.1)
+      .addScaledVector(validBack, 0.1)
+      .addScaledVector(validLeft, 0.1)
+      .addScaledVector(validRight, 0.1);
+    
+    // Temporal smoothing with previous normal to reduce jitter
+    blendedNormal.lerp(prevNormalRef.current, 0.7).normalize();
+    prevNormalRef.current.copy(blendedNormal);
+    
+    // Verify it's a valid normal after blending
+    if (blendedNormal.y < 0.1) {
+      blendedNormal.set(0, 1, 0); // Safety fallback
+    }
+    
+    // Only align if normal is valid and slope isn't too steep
+    if (blendedNormal.y > MAX_SLOPE_DOT) {
+      // Create rotation to align tank up direction with terrain normal
+      const alignQuat = new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0), // Up vector
+        blendedNormal // Blended terrain normal
+      );
+      
+      // Combine alignments: First align to terrain, then apply direction rotation
+      const tankYQuat = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(0, rotationRef.current.y, 0)
+      );
+      
+      // Fixed quaternion multiplication order
+      const finalRotation = new THREE.Quaternion().multiplyQuaternions(tankYQuat, alignQuat);
+      
+      // Very gradual rotation with frame-rate independence
+      let slerpFactor = ROTATION_SMOOTHING * clampedDelta * 60;
+      slerpFactor = Math.min(slerpFactor, 0.08); // Cap even with high delta
+      
+      // Even slower rotation during recovery mode
+      if (recoveryMode) {
+        slerpFactor *= 0.3;
+      }
+      
+      tankRef.current.quaternion.slerp(finalRotation, slerpFactor);
+      tankRef.current.updateMatrix();
+      
+      // In stable conditions, increment our stability counter
+      stabilityCounterRef.current++;
+      if (stabilityCounterRef.current > STABILITY_THRESHOLD && recoveryMode) {
+        setRecoveryMode(false);
+      }
+    } else {
+      // On steep slopes, keep Y rotation but don't align to terrain
+      const tankYQuat = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(0, rotationRef.current.y, 0)
+      );
+      tankRef.current.quaternion.slerp(tankYQuat, 0.05);
+      stabilityCounterRef.current = 0;
     }
     
     // Call onMove callback with the new position for camera following
@@ -264,7 +297,7 @@ export default function Tank({
   return (
     <group 
       ref={tankRef} 
-      position={[position[0], 0.5, position[2]]} 
+      position={[position[0], 0, position[2]]} // Initial position will be set in useEffect
       castShadow 
       receiveShadow
     >

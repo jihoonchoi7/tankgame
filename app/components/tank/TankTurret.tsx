@@ -15,7 +15,7 @@ const TankTurret = forwardRef<THREE.Group, TankTurretProps>(function TankTurret(
   useImperativeHandle(ref, () => groupRef.current!);
   
   return (
-    <group ref={groupRef} position={[0, 1.0, 0]}>
+    <group ref={groupRef} position={[0, 0.9, 0]}>
       {/* Turret base - rotating part */}
       <mesh castShadow receiveShadow>
         <cylinderGeometry args={[0.9, 1.1, 0.5, 16]} />
