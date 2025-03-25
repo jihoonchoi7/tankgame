@@ -60,6 +60,7 @@ export interface TerrainFunctions {
   getTerrainHeight: (x: number, z: number) => number;
   getTerrainNormal: (x: number, z: number) => THREE.Vector3;
   isInWater: (x: number, z: number) => boolean;
+  getTerrainSize: () => number;
 }
 
 interface TerrainGroundProps {
@@ -106,8 +107,8 @@ const TerrainGround = forwardRef(({ onHeightUpdate }: TerrainGroundProps, ref) =
         // Flatten terrain slightly to create more plateaus (like in the reference image)
         height = Math.round(height * 2) / 2;
         
-        // Ensure height is never negative (below ground)
-        height = Math.max(height, 0);
+        // Ensure height is never negative (below ground) and has a minimum value
+        height = Math.max(height, 0.05); // Slight minimum height to prevent gaps
         
         // Store height data for later use
         heightData[z][x] = height;
@@ -226,14 +227,18 @@ const TerrainGround = forwardRef(({ onHeightUpdate }: TerrainGroundProps, ref) =
     return normal;
   };
   
-  // For compatibility, but no water now
+  // Dummy function for isInWater (no water in this version)
   const isInWater = () => false;
+  
+  // Getter for terrain size
+  const getTerrainSize = () => size;
 
   // Expose terrain functions to parent components
   useImperativeHandle(ref, () => ({
     getTerrainHeight,
     getTerrainNormal,
-    isInWater
+    isInWater,
+    getTerrainSize
   }));
   
   // Call onHeightUpdate with terrain functions when component mounts
@@ -242,7 +247,8 @@ const TerrainGround = forwardRef(({ onHeightUpdate }: TerrainGroundProps, ref) =
       onHeightUpdate({
         getTerrainHeight,
         getTerrainNormal,
-        isInWater
+        isInWater,
+        getTerrainSize
       });
     }
   }, []);
@@ -288,7 +294,7 @@ const TerrainGround = forwardRef(({ onHeightUpdate }: TerrainGroundProps, ref) =
           vertexColors={false}
           roughness={0.8}
           metalness={0.1}
-          side={THREE.DoubleSide}
+          side={THREE.FrontSide}
           flatShading={true}
         >
           <primitive 
@@ -316,20 +322,20 @@ const TerrainGround = forwardRef(({ onHeightUpdate }: TerrainGroundProps, ref) =
                   `// Low-poly stylized coloring based on height
                   vec3 terrainColor;
                   
-                  // Base green color
-                  terrainColor = vec3(0.192, 0.48, 0.082);
+                  // Base green color - changed to match Ground.tsx color
+                  terrainColor = vec3(0.227, 0.494, 0.298); // #3a7e4c
                   
-                  // Lighter green for higher elevations
+                  // Lighter green for higher elevations - maintain consistent appearance
                   terrainColor = mix(
                     terrainColor,
-                    vec3(0.247, 0.573, 0.129),
+                    vec3(0.267, 0.573, 0.349),
                     smoothstep(1.0, 3.0, vHeight)
                   );
                   
                   // Mountain/hill color for highest areas
                   terrainColor = mix(
                     terrainColor,
-                    vec3(0.5, 0.5, 0.4),
+                    vec3(0.4, 0.5, 0.4),
                     smoothstep(3.5, 4.5, vHeight)
                   );
                   
