@@ -65,6 +65,11 @@ export default function Tank({
   const lastShootTime = useRef(0);
   const canShoot = useRef(true);
   
+  // Add refs to store timeout IDs
+  const muzzleFlashTimeoutRef = useRef<NodeJS.Timeout>();
+  const cannonRecoilTimeoutRef = useRef<NodeJS.Timeout>();
+  const shootCooldownTimeoutRef = useRef<NodeJS.Timeout>();
+  
   // Initialize tank at the correct terrain height
   useEffect(() => {
     if (tankRef.current) {
@@ -73,6 +78,16 @@ export default function Tank({
       prevHeightRef.current = initialHeight + 0.25;
       tankRef.current.position.copy(positionRef.current);
     }
+  }, []);
+  
+  // Add cleanup effect to clear timeouts on unmount
+  useEffect(() => {
+    return () => {
+      // Clear all timeouts when component unmounts
+      if (muzzleFlashTimeoutRef.current) clearTimeout(muzzleFlashTimeoutRef.current);
+      if (cannonRecoilTimeoutRef.current) clearTimeout(cannonRecoilTimeoutRef.current);
+      if (shootCooldownTimeoutRef.current) clearTimeout(shootCooldownTimeoutRef.current);
+    };
   }, []);
   
   useFrame((state, delta) => {
@@ -287,7 +302,6 @@ export default function Tank({
         
         // Get the current position and direction from the turret
         if (turretRef.current) {
-          const turretWorldPos = new THREE.Vector3();
           const barrelTip = new THREE.Vector3(0, 0.25, 3.3); // Position of barrel tip
           
           // Convert barrel tip to world coordinates
@@ -315,20 +329,25 @@ export default function Tank({
           // Set cannon recoil
           setCannonRecoil(-0.3); // Negative value moves the cannon backward
           
-          // Reset muzzle flash after a short delay
-          setTimeout(() => {
+          // Clear any existing timeouts first
+          if (shootCooldownTimeoutRef.current) clearTimeout(shootCooldownTimeoutRef.current);
+          if (muzzleFlashTimeoutRef.current) clearTimeout(muzzleFlashTimeoutRef.current);
+          if (cannonRecoilTimeoutRef.current) clearTimeout(cannonRecoilTimeoutRef.current);
+          
+          // Allow shooting again after cooldown - store timeout ID
+          shootCooldownTimeoutRef.current = setTimeout(() => {
+            canShoot.current = true;
+          }, SHOOT_COOLDOWN);
+          
+          // Reset muzzle flash after a short delay - store timeout ID
+          muzzleFlashTimeoutRef.current = setTimeout(() => {
             setMuzzleFlash(false);
           }, 100);
           
-          // Reset cannon position after recoil
-          setTimeout(() => {
+          // Reset cannon position after recoil - store timeout ID
+          cannonRecoilTimeoutRef.current = setTimeout(() => {
             setCannonRecoil(0);
           }, 300);
-          
-          // Allow shooting again after cooldown
-          setTimeout(() => {
-            canShoot.current = true;
-          }, SHOOT_COOLDOWN);
           
           console.log("Turret Direction:", turretDirection.x, turretDirection.y, turretDirection.z);
           

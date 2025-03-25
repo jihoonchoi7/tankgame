@@ -17,22 +17,28 @@ export default function Projectile({
   direction, 
   onRemove 
 }: ProjectileProps) {
-  const meshRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
   const position = useRef(new THREE.Vector3(...initialPosition));
   const dir = useRef(new THREE.Vector3(...direction).normalize());
   const speed = 0.6; // Units per frame
   const lifetime = 2000; // ms
-  const [trailPositions, setTrailPositions] = useState<THREE.Vector3[]>([]);
+  
+  // Replace state with ref for trail positions
+  const trailPositionsRef = useRef<THREE.Vector3[]>([]);
+  // Keep a minimal state just for triggering renders when needed
+  const [trailUpdated, setTrailUpdated] = useState(0);
+  // Add maximum trail length as a constant
+  const MAX_TRAIL_LENGTH = 10;
+  // Add a ref for the instanced mesh
+  const trailMeshRef = useRef<THREE.InstancedMesh>(null);
+  // Add a temporary matrix for updating instance transforms
+  const tempMatrix = useRef(new THREE.Matrix4());
   
   useEffect(() => {
     // Remove projectile after lifetime expires
     const timer = setTimeout(() => {
       onRemove(id);
     }, lifetime);
-    
-    // Add this in useEffect
-    console.log("Projectile Direction:", dir.current.x, dir.current.y, dir.current.z);
     
     return () => clearTimeout(timer);
   }, [id, onRemove]);
@@ -43,12 +49,39 @@ export default function Projectile({
     // Update position along direction vector
     position.current.addScaledVector(dir.current, speed);
     
-    // Add position to trail (keeping only recent positions)
-    setTrailPositions(prev => {
-      const newPositions = [...prev, position.current.clone()];
-      if (newPositions.length > 10) newPositions.shift();
-      return newPositions;
-    });
+    // Update trail positions in the ref (not state)
+    const newPositions = [...trailPositionsRef.current, position.current.clone()];
+    if (newPositions.length > MAX_TRAIL_LENGTH) newPositions.shift();
+    trailPositionsRef.current = newPositions;
+    
+    // Update instanced mesh positions and scales
+    if (trailMeshRef.current) {
+      trailPositionsRef.current.forEach((_, i) => {
+        // Reset the matrix
+        tempMatrix.current.identity();
+        
+        // Set position
+        tempMatrix.current.setPosition(0, 0, -0.3 - (i * 0.1));
+        
+        // Set scale
+        const scale = 0.5 - i * 0.04;
+        tempMatrix.current.scale(new THREE.Vector3(scale, scale, scale));
+        
+        // Apply the matrix to this instance
+        trailMeshRef.current.setMatrixAt(i, tempMatrix.current);
+      });
+      
+      // Important! Flag the instanceMatrix as needing an update
+      trailMeshRef.current.instanceMatrix.needsUpdate = true;
+      
+      // Update the count to match our current trail length
+      trailMeshRef.current.count = trailPositionsRef.current.length;
+    }
+    
+    // Occasionally update the state to trigger re-renders
+    if (state.clock.elapsedTime % 0.1 < delta) {
+      setTrailUpdated(prev => prev + 1);
+    }
     
     // Apply to group
     groupRef.current.position.copy(position.current);
@@ -88,25 +121,19 @@ export default function Projectile({
       {/* Enhanced tracer effect - adjusted position */}
       <pointLight position={[0, 0, -0.35]} intensity={2} distance={3} color="orange" />
       
-      {/* Trail effect - adjusted for Z-forward orientation */}
-      {trailPositions.map((pos, i) => (
-        <mesh 
-          key={i} 
-          position={[
-            0, 
-            0, 
-            -0.3 - (i * 0.1)
-          ]} 
-          scale={[0.5 - i * 0.04, 0.5 - i * 0.04, 0.5 - i * 0.04]}
-        >
-          <sphereGeometry args={[0.1, 8, 8]} />
-          <meshBasicMaterial 
-            color="orange" 
-            opacity={0.7 - (i * 0.06)} 
-            transparent={true} 
-          />
-        </mesh>
-      ))}
+      {/* Trail effect - now using instancedMesh for better performance */}
+      <instancedMesh 
+        ref={trailMeshRef} 
+        args={[null, null, MAX_TRAIL_LENGTH]} // args: [geometry, material, instanceCount]
+      >
+        <sphereGeometry args={[0.1, 8, 8]} />
+        <meshBasicMaterial 
+          color="orange" 
+          opacity={0.7} 
+          transparent={true} 
+          toneMapped={false}
+        />
+      </instancedMesh>
     </group>
   );
 } 

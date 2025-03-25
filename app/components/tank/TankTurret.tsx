@@ -33,15 +33,25 @@ const TankTurret = forwardRef<THREE.Group, TankTurretProps>(function TankTurret(
       </mesh>
       
       {/* Main cannon - with recoil animation */}
-      <group position={[0, 0.25, cannonRecoil]} rotation={[0, 0, 0]}>
-        {/* Cannon barrel */}
-        <mesh position={[0, 0, 1.8]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
+      <group position={[0, 0.25, 0]} rotation={[0, 0, 0]}>
+        {/* Cannon barrel - apply recoil to barrel's position directly */}
+        <mesh 
+          position={[0, 0, 1.8 + cannonRecoil]} 
+          rotation={[Math.PI / 2, 0, 0]} 
+          castShadow 
+          receiveShadow
+        >
           <cylinderGeometry args={[0.2, 0.2, 3, 16]} />
           <meshStandardMaterial color="#333333" roughness={0.4} metalness={0.9} />
         </mesh>
         
-        {/* Barrel base/attachment */}
-        <mesh position={[0, 0, 0.4]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
+        {/* Barrel base/attachment - apply recoil to base position too */}
+        <mesh 
+          position={[0, 0, 0.4 + cannonRecoil]} 
+          rotation={[Math.PI / 2, 0, 0]} 
+          castShadow 
+          receiveShadow
+        >
           <cylinderGeometry args={[0.25, 0.25, 0.6, 16]} />
           <meshStandardMaterial color="#333333" roughness={0.4} metalness={0.9} />
         </mesh>
