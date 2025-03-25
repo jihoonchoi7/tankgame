@@ -33,6 +33,11 @@ export default function Projectile({
   const trailMeshRef = useRef<THREE.InstancedMesh>(null);
   // Add a temporary matrix for updating instance transforms
   const tempMatrix = useRef(new THREE.Matrix4());
+  // Add a vector pool for reusing Vector3 objects
+  const vectorPoolRef = useRef<THREE.Vector3[]>(
+    Array(MAX_TRAIL_LENGTH + 1).fill(0).map(() => new THREE.Vector3())
+  );
+  const poolIndexRef = useRef(0);
   
   useEffect(() => {
     // Remove projectile after lifetime expires
@@ -49,8 +54,14 @@ export default function Projectile({
     // Update position along direction vector
     position.current.addScaledVector(dir.current, speed);
     
-    // Update trail positions in the ref (not state)
-    const newPositions = [...trailPositionsRef.current, position.current.clone()];
+    // Get a vector from the pool and set its value
+    const poolIndex = poolIndexRef.current % vectorPoolRef.current.length;
+    const trailPosition = vectorPoolRef.current[poolIndex];
+    trailPosition.copy(position.current);
+    poolIndexRef.current++;
+    
+    // Add the vector from pool to trail positions
+    const newPositions = [...trailPositionsRef.current, trailPosition];
     if (newPositions.length > MAX_TRAIL_LENGTH) newPositions.shift();
     trailPositionsRef.current = newPositions;
     
@@ -68,7 +79,7 @@ export default function Projectile({
         tempMatrix.current.scale(new THREE.Vector3(scale, scale, scale));
         
         // Apply the matrix to this instance
-        trailMeshRef.current.setMatrixAt(i, tempMatrix.current);
+        trailMeshRef.current?.setMatrixAt(i, tempMatrix.current);
       });
       
       // Important! Flag the instanceMatrix as needing an update
@@ -124,7 +135,7 @@ export default function Projectile({
       {/* Trail effect - now using instancedMesh for better performance */}
       <instancedMesh 
         ref={trailMeshRef} 
-        args={[null, null, MAX_TRAIL_LENGTH]} // args: [geometry, material, instanceCount]
+        args={[undefined, undefined, MAX_TRAIL_LENGTH]} // args: [geometry, material, instanceCount]
       >
         <sphereGeometry args={[0.1, 8, 8]} />
         <meshBasicMaterial 

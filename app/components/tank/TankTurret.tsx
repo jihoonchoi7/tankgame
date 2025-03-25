@@ -79,20 +79,20 @@ const TankTurret = forwardRef<THREE.Group, TankTurretProps>(function TankTurret(
       {muzzleFlash && (
         <>
           {/* Inner bright flash */}
-          <mesh position={[0, 0.25, 3.5]} rotation={[Math.PI / 2, 0, 0]}>
+          <mesh position={[0, 0.25, 3.5 + cannonRecoil]} rotation={[Math.PI / 2, 0, 0]}>
             <cylinderGeometry args={[0.2, 0.35, 0.3, 16]} />
             <meshBasicMaterial color="#ffff80" transparent opacity={0.9} />
           </mesh>
           
           {/* Outer flash glow */}
-          <mesh position={[0, 0.25, 3.6]} rotation={[Math.PI / 2, 0, 0]}>
+          <mesh position={[0, 0.25, 3.6 + cannonRecoil]} rotation={[Math.PI / 2, 0, 0]}>
             <cylinderGeometry args={[0.4, 0.2, 0.5, 16]} />
             <meshBasicMaterial color="#ff8c00" transparent opacity={0.6} />
           </mesh>
           
           {/* Point light for illumination */}
           <pointLight
-            position={[0, 0.25, 3.6]}
+            position={[0, 0.25, 3.6 + cannonRecoil]}
             distance={5}
             intensity={5}
             color="#ffcc00"
@@ -101,7 +101,7 @@ const TankTurret = forwardRef<THREE.Group, TankTurretProps>(function TankTurret(
       )}
       
       {/* Permanent red light around barrel end - for laser visual effect */}
-      <pointLight position={[0, 0.25, 3.3]} intensity={0.5} distance={2} color="red" />
+      <pointLight position={[0, 0.25, 3.3 + cannonRecoil]} intensity={0.5} distance={2} color="red" />
     </group>
   );
 });
