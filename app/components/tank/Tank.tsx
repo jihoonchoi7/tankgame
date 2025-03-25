@@ -53,12 +53,22 @@ export default function Tank({
   // Constants with tweaked values
   const MOVE_SPEED = 0.1;
   const ROTATION_SPEED = 0.02;
-  const SHOOT_COOLDOWN = 400; // ms
+  const SHOOT_COOLDOWN = 500; // ms
   const MAX_SLOPE_DOT = 0.4; // Lower value = can climb steeper slopes
   const SAMPLE_DISTANCE = 1.2; // Reduced from 1.5 for more precise readings
   const ROTATION_SMOOTHING = 0.04; // Reduced for more gradual changes
   const HEIGHT_SMOOTHING = 0.03; // Very gradual height changes
   const STABILITY_THRESHOLD = 30; // Frames before exiting recovery mode
+  
+  const [muzzleFlash, setMuzzleFlash] = useState(false);
+  const [cannonRecoil, setCannonRecoil] = useState(0);
+  const lastShootTime = useRef(0);
+  const canShoot = useRef(true);
+  
+  // Add refs to store timeout IDs
+  const muzzleFlashTimeoutRef = useRef<NodeJS.Timeout>();
+  const cannonRecoilTimeoutRef = useRef<NodeJS.Timeout>();
+  const shootCooldownTimeoutRef = useRef<NodeJS.Timeout>();
   
   // Initialize tank at the correct terrain height
   useEffect(() => {
@@ -68,6 +78,16 @@ export default function Tank({
       prevHeightRef.current = initialHeight + 0.25;
       tankRef.current.position.copy(positionRef.current);
     }
+  }, []);
+  
+  // Add cleanup effect to clear timeouts on unmount
+  useEffect(() => {
+    return () => {
+      // Clear all timeouts when component unmounts
+      if (muzzleFlashTimeoutRef.current) clearTimeout(muzzleFlashTimeoutRef.current);
+      if (cannonRecoilTimeoutRef.current) clearTimeout(cannonRecoilTimeoutRef.current);
+      if (shootCooldownTimeoutRef.current) clearTimeout(shootCooldownTimeoutRef.current);
+    };
   }, []);
   
   useFrame((state, delta) => {
@@ -275,26 +295,64 @@ export default function Tank({
     onMove(positionRef.current.x, positionRef.current.y, positionRef.current.z);
     
     // Handle shooting
-    if (shoot && Date.now() - shootTimeRef.current > SHOOT_COOLDOWN) {
-      shootTimeRef.current = Date.now();
-      
-      if (turretRef.current) {
-        const turretWorldPosition = new THREE.Vector3();
-        turretRef.current.getWorldPosition(turretWorldPosition);
+    if (shoot && canShoot.current) {
+      if (state.clock.getElapsedTime() * 1000 - lastShootTime.current > SHOOT_COOLDOWN) {
+        lastShootTime.current = state.clock.getElapsedTime() * 1000;
+        canShoot.current = false;
         
-        // Get turret direction (forward vector)
-        const direction = new THREE.Vector3(0, 0, 1)
-          .applyEuler(rotationRef.current)
-          .normalize();
-        
-        // Start projectile a bit in front of the turret barrel
-        const projectilePosition: [number, number, number] = [
-          turretWorldPosition.x + direction.x * 3.3,  // Adjusted to match barrel end
-          turretWorldPosition.y + 0.25,               // Match barrel height
-          turretWorldPosition.z + direction.z * 3.3   // Adjusted to match barrel end
-        ];
-        
-        onShoot(projectilePosition, [direction.x, direction.y, direction.z]);
+        // Get the current position and direction from the turret
+        if (turretRef.current) {
+          const barrelTip = new THREE.Vector3(0, 0.25, 3.3); // Position of barrel tip
+          
+          // Convert barrel tip to world coordinates
+          barrelTip.applyMatrix4(turretRef.current.matrixWorld);
+          
+          // Get turret direction (forward vector)
+          const turretDirection = new THREE.Vector3(0, 0, 1);
+          turretDirection.applyQuaternion(turretRef.current.quaternion);
+          turretDirection.applyQuaternion(tankRef.current.quaternion);
+          turretDirection.normalize();
+          
+          // Set the projectile position to be at the end of the barrel
+          const projectilePosition: [number, number, number] = [
+            barrelTip.x,
+            barrelTip.y,
+            barrelTip.z
+          ];
+          
+          // Get the direction as a normalized vector
+          const direction = turretDirection;
+          
+          // Show muzzle flash
+          setMuzzleFlash(true);
+          
+          // Set cannon recoil
+          setCannonRecoil(-0.3); // Negative value moves the cannon backward
+          
+          // Clear any existing timeouts first
+          if (shootCooldownTimeoutRef.current) clearTimeout(shootCooldownTimeoutRef.current);
+          if (muzzleFlashTimeoutRef.current) clearTimeout(muzzleFlashTimeoutRef.current);
+          if (cannonRecoilTimeoutRef.current) clearTimeout(cannonRecoilTimeoutRef.current);
+          
+          // Allow shooting again after cooldown - store timeout ID
+          shootCooldownTimeoutRef.current = setTimeout(() => {
+            canShoot.current = true;
+          }, SHOOT_COOLDOWN);
+          
+          // Reset muzzle flash after a short delay - store timeout ID
+          muzzleFlashTimeoutRef.current = setTimeout(() => {
+            setMuzzleFlash(false);
+          }, 100);
+          
+          // Reset cannon position after recoil - store timeout ID
+          cannonRecoilTimeoutRef.current = setTimeout(() => {
+            setCannonRecoil(0);
+          }, 300);
+          
+          console.log("Turret Direction:", turretDirection.x, turretDirection.y, turretDirection.z);
+          
+          onShoot(projectilePosition, [direction.x, direction.y, direction.z]);
+        }
       }
     }
   });
@@ -307,7 +365,7 @@ export default function Tank({
       receiveShadow
     >
       <TankBody />
-      <TankTurret ref={turretRef} />
+      <TankTurret ref={turretRef} muzzleFlash={muzzleFlash} cannonRecoil={cannonRecoil} />
     </group>
   );
 } 
