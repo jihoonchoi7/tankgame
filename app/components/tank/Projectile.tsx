@@ -109,15 +109,13 @@ export default function Projectile({
           particle.velocity.y -= 0.01; // Add gravity effect
           
           // Update instanced mesh
-          if (explosionRef.current) {
-            tempMatrix.current.makeTranslation(
-              particle.position.x,
-              particle.position.y,
-              particle.position.z
-            );
-            (explosionRef.current.children[0] as THREE.InstancedMesh).setMatrixAt(i, tempMatrix.current);
-            (explosionRef.current.children[0] as THREE.InstancedMesh).instanceMatrix.needsUpdate = true;
-          }
+          tempMatrix.current.makeTranslation(
+            particle.position.x,
+            particle.position.y,
+            particle.position.z
+          );
+          (explosionRef.current.children[0] as THREE.InstancedMesh).setMatrixAt(i, tempMatrix.current);
+          (explosionRef.current.children[0] as THREE.InstancedMesh).instanceMatrix.needsUpdate = true;
         });
       }
     } else {
@@ -224,7 +222,7 @@ export default function Projectile({
           {/* Tracer effect */}
           <pointLight 
             position={[0, 0, -0.35]} 
-            intensity={type === 'machineGun' ? 2 : 2} 
+            intensity={2}
             distance={type === 'machineGun' ? 2 : 3} 
             color={type === 'machineGun' ? "#ffff00" : "orange"} 
           />

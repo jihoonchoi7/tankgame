@@ -36,7 +36,7 @@ const TankTurret = forwardRef<THREE.Group, TankTurretProps>(function TankTurret(
         const position = new THREE.Vector3(
           0,
           0,
-          (i / MAX_TRACERS) * 2 // Spread tracers along the firing direction
+          (i / MAX_TRACERS) * 2 * delta * 60 // Scale movement by delta time and normalize to 60fps
         );
         const scale = new THREE.Vector3(0.02, 0.02, 0.15);
         const rotation = new THREE.Quaternion().setFromEuler(
