@@ -33,7 +33,8 @@ export default function Home() {
             <li><strong>A</strong> - Turn left</li>
             <li><strong>D</strong> - Turn right</li>
             <li><strong>Q/E</strong> - Rotate turret</li>
-            <li><strong>SPACE</strong> - Fire laser</li>
+            <li><strong>F</strong> - Switch weapon (Main Gun/Machine Gun)</li>
+            <li><strong>SPACE</strong> - Fire weapon</li>
           </ul>
         </div>
       </div>

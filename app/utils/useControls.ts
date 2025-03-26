@@ -11,6 +11,7 @@ export const useControls = () => {
     rotateLeft: false,
     rotateRight: false,
     shoot: false,
+    weaponType: 'main' as 'main' | 'machineGun'
   });
 
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -35,6 +36,12 @@ export const useControls = () => {
         break;
       case " ": // Space key
         setKeys((keys) => ({ ...keys, shoot: true }));
+        break;
+      case "f": // Weapon switch key
+        setKeys((keys) => ({ 
+          ...keys, 
+          weaponType: keys.weaponType === 'main' ? 'machineGun' : 'main' 
+        }));
         break;
     }
   };
@@ -75,5 +82,14 @@ export const useControls = () => {
     };
   }, []);
 
-  return keys;
+  return {
+    moveForward: keys.moveForward,
+    moveBackward: keys.moveBackward,
+    moveLeft: keys.moveLeft,
+    moveRight: keys.moveRight,
+    rotateLeft: keys.rotateLeft,
+    rotateRight: keys.rotateRight,
+    shoot: keys.shoot,
+    weaponType: keys.weaponType
+  };
 }; 

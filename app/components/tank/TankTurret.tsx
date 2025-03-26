@@ -1,23 +1,56 @@
 "use client";
 
-import { forwardRef, useImperativeHandle, useRef } from "react";
+import { forwardRef, useImperativeHandle, useRef, useEffect } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 
 interface TankTurretProps {
   muzzleFlash?: boolean;
   cannonRecoil?: number;
+  machineGunActive?: boolean;
+  isFiring?: boolean;
 }
 
 const TankTurret = forwardRef<THREE.Group, TankTurretProps>(function TankTurret(
-  { muzzleFlash = false, cannonRecoil = 0 },
+  { muzzleFlash = false, cannonRecoil = 0, machineGunActive = false, isFiring = false },
   ref
 ) {
   const groupRef = useRef<THREE.Group>(null);
-  
+  const tracersRef = useRef<THREE.InstancedMesh>(null);
+  const MAX_TRACERS = 20;
+  const tracerMatrices = useRef<THREE.Matrix4[]>([]);
+
+  // Initialize tracer matrices
+  useEffect(() => {
+    tracerMatrices.current = Array(MAX_TRACERS).fill(0).map(() => new THREE.Matrix4());
+  }, []);
+
   // Expose the group ref to the parent component
   useImperativeHandle(ref, () => groupRef.current!);
-  
+
+  // Update tracer animations
+  useFrame((state, delta) => {
+    if (tracersRef.current && isFiring && machineGunActive) {
+      // Update each tracer
+      tracerMatrices.current.forEach((matrix, i) => {
+        const position = new THREE.Vector3(
+          0,
+          0,
+          (i / MAX_TRACERS) * 2 // Spread tracers along the firing direction
+        );
+        const scale = new THREE.Vector3(0.02, 0.02, 0.15);
+        const rotation = new THREE.Quaternion().setFromEuler(
+          new THREE.Euler(0, 0, Math.random() * Math.PI * 2)
+        );
+
+        matrix.compose(position, rotation, scale);
+        tracersRef.current?.setMatrixAt(i, matrix);
+      });
+      
+      tracersRef.current.instanceMatrix.needsUpdate = true;
+    }
+  });
+
   return (
     <group ref={groupRef} position={[0, 0.9, 0]}>
       {/* Turret base - rotating part */}
@@ -64,10 +97,84 @@ const TankTurret = forwardRef<THREE.Group, TankTurretProps>(function TankTurret(
       </mesh>
       
       {/* Machine gun mount */}
-      <mesh position={[0, 0.5, 0.4]} castShadow receiveShadow>
-        <boxGeometry args={[0.2, 0.15, 0.35]} />
-        <meshStandardMaterial color="#333333" roughness={0.7} metalness={0.6} />
-      </mesh>
+      <group position={[0.6, 0.3, 0.5]} rotation={[0, 0, 0]}>
+        {/* Machine gun mount base - connects to turret */}
+        <mesh castShadow receiveShadow>
+          <cylinderGeometry args={[0.1, 0.1, 0.2, 8]} />
+          <meshStandardMaterial color="#333333" roughness={0.7} metalness={0.6} />
+        </mesh>
+
+        {/* Machine gun pivot joint */}
+        <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
+          <sphereGeometry args={[0.08, 8, 8]} />
+          <meshStandardMaterial color="#222222" roughness={0.5} metalness={0.8} />
+        </mesh>
+
+        {/* Machine gun assembly */}
+        <group position={[0, 0.1, 0]} rotation={[0, 0, 0]}>
+          {/* Machine gun base housing */}
+          <mesh position={[0, 0, 0.15]} castShadow receiveShadow>
+            <boxGeometry args={[0.15, 0.15, 0.3]} />
+            <meshStandardMaterial color="#444444" roughness={0.6} metalness={0.8} />
+          </mesh>
+          
+          {/* Machine gun cooling jacket */}
+          <mesh position={[0, 0, 0.8]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[0.06, 0.06, 1.2, 8]} />
+            <meshStandardMaterial color="#333333" roughness={0.4} metalness={0.9} />
+          </mesh>
+
+          {/* Machine gun barrel */}
+          <mesh position={[0, 0, 1.3]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[0.04, 0.04, 0.8, 8]} />
+            <meshStandardMaterial color="#222222" roughness={0.3} metalness={0.9} />
+          </mesh>
+
+          {/* Machine gun muzzle */}
+          <mesh position={[0, 0, 1.7]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[0.05, 0.03, 0.1, 8]} />
+            <meshStandardMaterial color="#111111" roughness={0.3} metalness={0.9} />
+          </mesh>
+
+          {/* Machine gun effects */}
+          {machineGunActive && isFiring && (
+            <>
+              {/* Muzzle flash */}
+              <group position={[0, 0, 1.75]}>
+                <mesh rotation={[Math.PI / 2, 0, 0]}>
+                  <cylinderGeometry args={[0.03, 0.06, 0.15, 8]} />
+                  <meshBasicMaterial color="#ffff80" transparent opacity={0.9} />
+                </mesh>
+                
+                <mesh rotation={[Math.PI / 2, 0, 0]}>
+                  <cylinderGeometry args={[0.08, 0.04, 0.25, 8]} />
+                  <meshBasicMaterial color="#ffff00" transparent opacity={0.6} />
+                </mesh>
+
+                <pointLight
+                  position={[0, 0, 0.1]}
+                  distance={2}
+                  intensity={2}
+                  color="#ffff00"
+                />
+              </group>
+
+              {/* Tracer effect */}
+              <instancedMesh 
+                ref={tracersRef} 
+                args={[undefined, undefined, MAX_TRACERS]}
+              >
+                <cylinderGeometry args={[0.02, 0.02, 0.15, 8]} />
+                <meshBasicMaterial 
+                  color="#ffff00" 
+                  transparent 
+                  opacity={0.8}
+                />
+              </instancedMesh>
+            </>
+          )}
+        </group>
+      </group>
       
       {/* Gun barrel muzzle with laser effect */}
       <mesh position={[0, 0.25, 3.3]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
