@@ -20,9 +20,40 @@ const TankTurret = forwardRef<THREE.Group, TankTurretProps>(function TankTurret(
   const MAX_TRACERS = 20;
   const tracerMatrices = useRef<THREE.Matrix4[]>([]);
 
-  // Initialize tracer matrices
+  // Add refs for geometry and material to prevent recreation
+  const tracerGeometryRef = useRef<THREE.CylinderGeometry | null>(null);
+  const tracerMaterialRef = useRef<THREE.MeshBasicMaterial | null>(null);
+
+  // Initialize tracer matrices, geometry, and material
   useEffect(() => {
     tracerMatrices.current = Array(MAX_TRACERS).fill(0).map(() => new THREE.Matrix4());
+    
+    // Create geometry and material once
+    tracerGeometryRef.current = new THREE.CylinderGeometry(0.02, 0.02, 0.15, 8);
+    tracerMaterialRef.current = new THREE.MeshBasicMaterial({
+      color: "#ffff00",
+      transparent: true,
+      opacity: 0.8
+    });
+
+    // Cleanup function
+    return () => {
+      // Clear the matrices array
+      tracerMatrices.current.forEach(matrix => {
+        matrix.set(0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0);
+      });
+      tracerMatrices.current = [];
+
+      // Dispose geometry and material
+      tracerGeometryRef.current?.dispose();
+      tracerMaterialRef.current?.dispose();
+      
+      // Dispose the instancedMesh
+      if (tracersRef.current) {
+        tracersRef.current.dispose();
+        tracersRef.current = null;
+      }
+    };
   }, []);
 
   // Expose the group ref to the parent component
@@ -162,15 +193,8 @@ const TankTurret = forwardRef<THREE.Group, TankTurretProps>(function TankTurret(
               {/* Tracer effect */}
               <instancedMesh 
                 ref={tracersRef} 
-                args={[undefined, undefined, MAX_TRACERS]}
-              >
-                <cylinderGeometry args={[0.02, 0.02, 0.15, 8]} />
-                <meshBasicMaterial 
-                  color="#ffff00" 
-                  transparent 
-                  opacity={0.8}
-                />
-              </instancedMesh>
+                args={[tracerGeometryRef.current!, tracerMaterialRef.current!, MAX_TRACERS]}
+              />
             </>
           )}
         </group>
