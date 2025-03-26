@@ -9,10 +9,15 @@ interface CloudProps {
   speed?: number;
 }
 
+// Animation constants
+const FADE_SPEED = 2;
+const MAX_OPACITY = 0.8;
+const CLOUD_TRAVEL_DISTANCE = 100; // Maximum distance a cloud travels before fading out
+
 export default function Cloud({ position, speed = 0.1 }: CloudProps) {
   const groupRef = useRef<THREE.Group>(null);
   const initialX = position[0];
-  const opacityRef = useRef(0.8);
+  const opacityRef = useRef(MAX_OPACITY);
   const isFadingRef = useRef(false);
 
   useFrame((state, delta) => {
@@ -21,14 +26,14 @@ export default function Cloud({ position, speed = 0.1 }: CloudProps) {
       groupRef.current.position.x += speed * delta;
       
       // Handle fading and position reset
-      if (groupRef.current.position.x > initialX + 100) {
+      if (groupRef.current.position.x > initialX + CLOUD_TRAVEL_DISTANCE) {
         if (!isFadingRef.current) {
           isFadingRef.current = true;
         }
         
         // Fade out
         if (opacityRef.current > 0) {
-          opacityRef.current = Math.max(0, opacityRef.current - delta * 2);
+          opacityRef.current = Math.max(0, opacityRef.current - delta * FADE_SPEED);
           groupRef.current.children.forEach(child => {
             if (child instanceof THREE.Mesh) {
               (child.material as THREE.MeshStandardMaterial).opacity = opacityRef.current;
@@ -36,12 +41,12 @@ export default function Cloud({ position, speed = 0.1 }: CloudProps) {
           });
         } else {
           // Reset position when fully transparent
-          groupRef.current.position.x = initialX - 100;
+          groupRef.current.position.x = initialX - CLOUD_TRAVEL_DISTANCE;
           isFadingRef.current = false;
         }
-      } else if (isFadingRef.current === false && opacityRef.current < 0.8) {
+      } else if (isFadingRef.current === false && opacityRef.current < MAX_OPACITY) {
         // Fade in after reset
-        opacityRef.current = Math.min(0.8, opacityRef.current + delta * 2);
+        opacityRef.current = Math.min(MAX_OPACITY, opacityRef.current + delta * FADE_SPEED);
         groupRef.current.children.forEach(child => {
           if (child instanceof THREE.Mesh) {
             (child.material as THREE.MeshStandardMaterial).opacity = opacityRef.current;

@@ -20,35 +20,69 @@ export default function EnvironmentElements({ terrainFunctions }: EnvironmentEle
     // Track all placed positions for minimum distance checks
     const placedPositions: [number, number, number][] = [];
     
-    // Helper function to get random position
-    const getRandomPosition = (): [number, number, number] => {
+    // Helper function to check if a position is too close to existing elements
+    const isTooClose = (pos: [number, number, number], minDistance: number): boolean => {
+      return placedPositions.some(existingPos => {
+        const dx = pos[0] - existingPos[0];
+        const dz = pos[2] - existingPos[2];
+        // Use distance squared for performance (avoid square root)
+        const distanceSquared = dx * dx + dz * dz;
+        return distanceSquared < minDistance * minDistance;
+      });
+    };
+    
+    // Helper function to get random position with minimum distance check
+    const getRandomPosition = (minDistance = 5): [number, number, number] => {
+      let attempts = 0;
+      const maxAttempts = 30; // Limit attempts to prevent infinite loops
+      
+      while (attempts < maxAttempts) {
+        const x = Math.random() * terrainSize - halfSize;
+        const z = Math.random() * terrainSize - halfSize;
+        const y = getTerrainHeight(x, z);
+        const position: [number, number, number] = [x, y, z];
+        
+        if (!isTooClose(position, minDistance)) {
+          placedPositions.push(position);
+          return position;
+        }
+        
+        attempts++;
+      }
+      
+      // If we exceeded max attempts, relax the constraint and try again
       const x = Math.random() * terrainSize - halfSize;
       const z = Math.random() * terrainSize - halfSize;
       const y = getTerrainHeight(x, z);
-      return [x, y, z];
+      const position: [number, number, number] = [x, y, z];
+      placedPositions.push(position);
+      return position;
     };
 
-    // Generate trees
+    // Generate trees (with larger minimum distance)
     const trees = Array.from({ length: 400 }, () => ({
-      position: getRandomPosition(),
+      position: getRandomPosition(8),
       scale: 0.5 + Math.random() * 1.5
     }));
 
-    // Generate rocks
+    // Generate rocks (with smaller minimum distance)
     const rocks = Array.from({ length: 100 }, () => ({
-      position: getRandomPosition(),
+      position: getRandomPosition(6),
       scale: 0.5 + Math.random() * 2
     }));
 
     // Generate clouds
-    const clouds = Array.from({ length: 40 }, () => ({
-      position: [
-        Math.random() * terrainSize - halfSize,
-        30 + Math.random() * 20,
-        Math.random() * terrainSize - halfSize
-      ] as [number, number, number],
-      speed: 0.5 + Math.random() * 2
-    }));
+    const clouds = Array.from({ length: 40 }, () => {
+      // Use getRandomPosition but with a smaller minimum distance for clouds
+      const position = getRandomPosition(10);
+      // Override the y-coordinate for cloud height
+      position[1] = 30 + Math.random() * 20;
+      
+      return {
+        position,
+        speed: 0.5 + Math.random() * 2
+      };
+    });
 
     return { trees, rocks, clouds };
   }, [terrainFunctions]);
