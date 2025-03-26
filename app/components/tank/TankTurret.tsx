@@ -67,7 +67,7 @@ const TankTurret = forwardRef<THREE.Group, TankTurretProps>(function TankTurret(
         const position = new THREE.Vector3(
           0,
           0,
-          (i / MAX_TRACERS) * 2 * delta * 60 // Scale movement by delta time and normalize to 60fps
+          (i / MAX_TRACERS) * 2 * delta * 60
         );
         const scale = new THREE.Vector3(0.02, 0.02, 0.15);
         const rotation = new THREE.Quaternion().setFromEuler(
@@ -191,10 +191,12 @@ const TankTurret = forwardRef<THREE.Group, TankTurretProps>(function TankTurret(
               </group>
 
               {/* Tracer effect */}
-              <instancedMesh 
-                ref={tracersRef} 
-                args={[tracerGeometryRef.current!, tracerMaterialRef.current!, MAX_TRACERS]}
-              />
+              {tracerGeometryRef.current && tracerMaterialRef.current && (
+                <instancedMesh 
+                  ref={tracersRef} 
+                  args={[tracerGeometryRef.current, tracerMaterialRef.current, MAX_TRACERS]}
+                />
+              )}
             </>
           )}
         </group>
