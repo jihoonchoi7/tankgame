@@ -36,6 +36,10 @@ export default function EnvironmentElements({ terrainFunctions }: EnvironmentEle
       let attempts = 0;
       const maxAttempts = 30; // Limit attempts to prevent infinite loops
       
+      // Track the best candidate position (furthest from existing elements)
+      let bestPosition: [number, number, number] | null = null;
+      let bestDistanceSquared = 0;
+      
       while (attempts < maxAttempts) {
         const x = Math.random() * terrainSize - halfSize;
         const z = Math.random() * terrainSize - halfSize;
@@ -47,16 +51,37 @@ export default function EnvironmentElements({ terrainFunctions }: EnvironmentEle
           return position;
         }
         
+        // If this position doesn't meet the criteria, check if it's better than our current best
+        let minDistanceSquared = Infinity;
+        for (const existingPos of placedPositions) {
+          const dx = position[0] - existingPos[0];
+          const dz = position[2] - existingPos[2];
+          const distanceSquared = dx * dx + dz * dz;
+          minDistanceSquared = Math.min(minDistanceSquared, distanceSquared);
+        }
+        
+        // If this is the furthest position from any existing element, make it our new best
+        if (minDistanceSquared > bestDistanceSquared) {
+          bestDistanceSquared = minDistanceSquared;
+          bestPosition = position;
+        }
+        
         attempts++;
       }
       
-      // If we exceeded max attempts, relax the constraint and try again
-      const x = Math.random() * terrainSize - halfSize;
-      const z = Math.random() * terrainSize - halfSize;
-      const y = getTerrainHeight(x, z);
-      const position: [number, number, number] = [x, y, z];
-      placedPositions.push(position);
-      return position;
+      // If we exceeded max attempts, use the best position we found
+      // or fall back to a random position if no best was found (empty terrain)
+      if (bestPosition) {
+        placedPositions.push(bestPosition);
+        return bestPosition;
+      } else {
+        const x = Math.random() * terrainSize - halfSize;
+        const z = Math.random() * terrainSize - halfSize;
+        const y = getTerrainHeight(x, z);
+        const position: [number, number, number] = [x, y, z];
+        placedPositions.push(position);
+        return position;
+      }
     };
 
     // Generate trees (with larger minimum distance)
