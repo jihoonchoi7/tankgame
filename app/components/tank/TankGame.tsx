@@ -9,6 +9,7 @@ import TerrainGround, { TerrainFunctions } from "../TerrainGround";
 import Tank from "./Tank";
 import Projectile from "./Projectile";
 import CameraController from "./CameraController";
+import EnvironmentElements from '../environment/EnvironmentElements';
 
 export default function TankGame() {
   const [projectiles, setProjectiles] = useState<Array<{ 
@@ -18,6 +19,7 @@ export default function TankGame() {
     type?: 'main' | 'machineGun' 
   }>>([]);
   const projectileIdRef = useRef(0);
+  const [terrainInitialized, setTerrainInitialized] = useState(false);
   const [terrainFunctions, setTerrainFunctions] = useState<TerrainFunctions>({
     getTerrainHeight: () => 0,
     getTerrainNormal: () => new THREE.Vector3(0, 1, 0),
@@ -67,6 +69,7 @@ export default function TankGame() {
   
   const handleTerrainUpdate = (functions: TerrainFunctions) => {
     setTerrainFunctions(functions);
+    setTerrainInitialized(true);
   };
   
   const updateTankPosition = (x: number, y: number, z: number) => {
@@ -82,40 +85,45 @@ export default function TankGame() {
         
         {/* Scene with terrain and tank */}
         <scene>
-          {/* Terrain */}
-          <TerrainGround onHeightUpdate={handleTerrainUpdate} />
-          
-          {/* Tank */}
-          <Tank 
-            position={[0, 0, 0]} 
-            moveForward={moveForward}
-            moveBackward={moveBackward}
-            moveLeft={moveLeft}
-            moveRight={moveRight}
-            rotateLeft={rotateLeft}
-            rotateRight={rotateRight}
-            shoot={shoot}
-            weaponType={weaponType}
-            onShoot={handleShoot}
-            onMachineGunShoot={handleMachineGunShoot}
-            getTerrainHeight={terrainFunctions.getTerrainHeight}
-            getTerrainNormal={terrainFunctions.getTerrainNormal}
-            onMove={updateTankPosition}
-            onRotationChange={(rotation) => setTankRotation(rotation)}
-          />
-          
-          {/* Projectiles */}
-          {projectiles.map((projectile) => (
-            <Projectile
-              key={projectile.id}
-              id={projectile.id}
-              initialPosition={projectile.position}
-              direction={projectile.direction}
-              onRemove={removeProjectile}
+          {/* Terrain and environment group */}
+          <group>
+            <TerrainGround onHeightUpdate={handleTerrainUpdate} />
+            {terrainInitialized && <EnvironmentElements terrainFunctions={terrainFunctions} />}
+          </group>
+
+          {/* Tank and projectiles group */}
+          <group>
+            <Tank 
+              position={[0, 0, 0]} 
+              moveForward={moveForward}
+              moveBackward={moveBackward}
+              moveLeft={moveLeft}
+              moveRight={moveRight}
+              rotateLeft={rotateLeft}
+              rotateRight={rotateRight}
+              shoot={shoot}
+              weaponType={weaponType}
+              onShoot={handleShoot}
+              onMachineGunShoot={handleMachineGunShoot}
               getTerrainHeight={terrainFunctions.getTerrainHeight}
-              type={projectile.type}
+              getTerrainNormal={terrainFunctions.getTerrainNormal}
+              onMove={updateTankPosition}
+              onRotationChange={(rotation) => setTankRotation(rotation)}
             />
-          ))}
+            
+            {/* Projectiles */}
+            {projectiles.map((projectile) => (
+              <Projectile
+                key={projectile.id}
+                id={projectile.id}
+                initialPosition={projectile.position}
+                direction={projectile.direction}
+                onRemove={removeProjectile}
+                getTerrainHeight={terrainFunctions.getTerrainHeight}
+                type={projectile.type}
+              />
+            ))}
+          </group>
         </scene>
         
         {/* Camera controller follows the tank */}
@@ -125,7 +133,7 @@ export default function TankGame() {
           getTerrainHeight={terrainFunctions.getTerrainHeight}
         />
         
-        {/* Lights and sky */}
+        {/* Lights */}
         <ambientLight intensity={0.5} />
         <directionalLight 
           position={[50, 50, -50]} 
