@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from 'react';
-import * as THREE from 'three';
+import { useMemo } from 'react';
 import { TerrainFunctions } from '../TerrainGround';
 import Tree from './Tree';
 import Rock from './Rock';
@@ -18,8 +17,11 @@ export default function EnvironmentElements({ terrainFunctions }: EnvironmentEle
     const terrainSize = getTerrainSize();
     const halfSize = terrainSize / 2;
     
+    // Track all placed positions for minimum distance checks
+    const placedPositions: [number, number, number][] = [];
+    
     // Helper function to get random position
-    const getRandomPosition = (minDist: number = 10): [number, number, number] => {
+    const getRandomPosition = (): [number, number, number] => {
       const x = Math.random() * terrainSize - halfSize;
       const z = Math.random() * terrainSize - halfSize;
       const y = getTerrainHeight(x, z);

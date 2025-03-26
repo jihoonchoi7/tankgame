@@ -19,6 +19,7 @@ export default function TankGame() {
     type?: 'main' | 'machineGun' 
   }>>([]);
   const projectileIdRef = useRef(0);
+  const [terrainInitialized, setTerrainInitialized] = useState(false);
   const [terrainFunctions, setTerrainFunctions] = useState<TerrainFunctions>({
     getTerrainHeight: () => 0,
     getTerrainNormal: () => new THREE.Vector3(0, 1, 0),
@@ -68,6 +69,7 @@ export default function TankGame() {
   
   const handleTerrainUpdate = (functions: TerrainFunctions) => {
     setTerrainFunctions(functions);
+    setTerrainInitialized(true);
   };
   
   const updateTankPosition = (x: number, y: number, z: number) => {
@@ -86,7 +88,7 @@ export default function TankGame() {
           {/* Terrain and environment group */}
           <group>
             <TerrainGround onHeightUpdate={handleTerrainUpdate} />
-            <EnvironmentElements terrainFunctions={terrainFunctions} />
+            {terrainInitialized && <EnvironmentElements terrainFunctions={terrainFunctions} />}
           </group>
 
           {/* Tank and projectiles group */}
