@@ -11,7 +11,12 @@ import Projectile from "./Projectile";
 import CameraController from "./CameraController";
 
 export default function TankGame() {
-  const [projectiles, setProjectiles] = useState<Array<{ id: number; position: [number, number, number]; direction: [number, number, number] }>>([]);
+  const [projectiles, setProjectiles] = useState<Array<{ 
+    id: number; 
+    position: [number, number, number]; 
+    direction: [number, number, number]; 
+    type?: 'main' | 'machineGun' 
+  }>>([]);
   const projectileIdRef = useRef(0);
   const [terrainFunctions, setTerrainFunctions] = useState<TerrainFunctions>({
     getTerrainHeight: () => 0,
@@ -23,7 +28,16 @@ export default function TankGame() {
   // For camera tracking
   const tankPositionRef = useRef(new THREE.Vector3(0, 0, 0));
   
-  const { moveForward, moveBackward, moveLeft, moveRight, rotateLeft, rotateRight, shoot } = useControls();
+  const { 
+    moveForward, 
+    moveBackward, 
+    moveLeft, 
+    moveRight, 
+    rotateLeft, 
+    rotateRight, 
+    shoot,
+    weaponType 
+  } = useControls();
   
   // Add state for tank rotation
   const [tankRotation, setTankRotation] = useState(0);
@@ -33,6 +47,16 @@ export default function TankGame() {
       id: projectileIdRef.current++,
       position,
       direction,
+    };
+    setProjectiles((prev) => [...prev, newProjectile]);
+  };
+  
+  const handleMachineGunShoot = (position: [number, number, number], direction: [number, number, number]) => {
+    const newProjectile = {
+      id: projectileIdRef.current++,
+      position,
+      direction,
+      type: 'machineGun'
     };
     setProjectiles((prev) => [...prev, newProjectile]);
   };
@@ -71,7 +95,9 @@ export default function TankGame() {
             rotateLeft={rotateLeft}
             rotateRight={rotateRight}
             shoot={shoot}
+            weaponType={weaponType}
             onShoot={handleShoot}
+            onMachineGunShoot={handleMachineGunShoot}
             getTerrainHeight={terrainFunctions.getTerrainHeight}
             getTerrainNormal={terrainFunctions.getTerrainNormal}
             onMove={updateTankPosition}
@@ -86,6 +112,8 @@ export default function TankGame() {
               initialPosition={projectile.position}
               direction={projectile.direction}
               onRemove={removeProjectile}
+              getTerrainHeight={terrainFunctions.getTerrainHeight}
+              type={projectile.type}
             />
           ))}
         </scene>

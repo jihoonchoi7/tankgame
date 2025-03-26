@@ -15,7 +15,9 @@ interface TankProps {
   rotateLeft: boolean;
   rotateRight: boolean;
   shoot: boolean;
+  weaponType: 'main' | 'machineGun';
   onShoot: (position: [number, number, number], direction: [number, number, number]) => void;
+  onMachineGunShoot?: (position: [number, number, number], direction: [number, number, number]) => void;
   // Terrain-related props
   getTerrainHeight?: (x: number, z: number) => number;
   getTerrainNormal?: (x: number, z: number) => THREE.Vector3;
@@ -32,7 +34,9 @@ export default function Tank({
   rotateLeft,
   rotateRight,
   shoot,
+  weaponType,
   onShoot,
+  onMachineGunShoot,
   getTerrainHeight = () => 0,
   getTerrainNormal = () => new THREE.Vector3(0, 1, 0),
   onMove = () => {},
@@ -70,6 +74,10 @@ export default function Tank({
   const cannonRecoilTimeoutRef = useRef<NodeJS.Timeout>();
   const shootCooldownTimeoutRef = useRef<NodeJS.Timeout>();
   
+  // Add new state for machine gun
+  const [isMachineGunFiring, setIsMachineGunFiring] = useState(false);
+  const machineGunIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
   // Initialize tank at the correct terrain height
   useEffect(() => {
     if (tankRef.current) {
@@ -89,6 +97,60 @@ export default function Tank({
       if (shootCooldownTimeoutRef.current) clearTimeout(shootCooldownTimeoutRef.current);
     };
   }, []);
+  
+  // Update the machine gun shooting effect
+  useEffect(() => {
+    if (shoot && weaponType === 'machineGun' && !machineGunIntervalRef.current && onMachineGunShoot) {
+      setIsMachineGunFiring(true);
+      machineGunIntervalRef.current = setInterval(() => {
+        if (turretRef.current && tankRef.current) {
+          try {
+            // Get machine gun position in world space
+            const machineGunTip = new THREE.Vector3(0.6, 0.3, 2.2);
+            const worldDir = new THREE.Vector3(0, 0, 1);
+            const matrix = turretRef.current.matrixWorld.clone();
+            
+            // Convert to world coordinates
+            machineGunTip.applyMatrix4(matrix);
+            worldDir.applyQuaternion(turretRef.current.quaternion);
+            worldDir.applyQuaternion(tankRef.current.quaternion);
+            worldDir.normalize();
+            
+            // Add spread
+            const spread = 0.05;
+            worldDir.x += (Math.random() - 0.5) * spread;
+            worldDir.y += (Math.random() - 0.5) * spread;
+            worldDir.z += (Math.random() - 0.5) * spread;
+            worldDir.normalize();
+            
+            onMachineGunShoot(
+              [machineGunTip.x, machineGunTip.y, machineGunTip.z],
+              [worldDir.x, worldDir.y, worldDir.z]
+            );
+          } catch (error) {
+            console.error('Error in machine gun shooting:', error);
+            if (machineGunIntervalRef.current) {
+              clearInterval(machineGunIntervalRef.current);
+              machineGunIntervalRef.current = null;
+            }
+            setIsMachineGunFiring(false);
+          }
+        }
+      }, 100);
+    } else if ((!shoot || weaponType !== 'machineGun') && machineGunIntervalRef.current) {
+      clearInterval(machineGunIntervalRef.current);
+      machineGunIntervalRef.current = null;
+      setIsMachineGunFiring(false);
+    }
+
+    return () => {
+      if (machineGunIntervalRef.current) {
+        clearInterval(machineGunIntervalRef.current);
+        machineGunIntervalRef.current = null;
+        setIsMachineGunFiring(false);
+      }
+    };
+  }, [shoot, weaponType, onMachineGunShoot]);
   
   useFrame((state, delta) => {
     if (!tankRef.current) return;
@@ -296,7 +358,7 @@ export default function Tank({
     
     // Handle shooting
     if (shoot && canShoot.current) {
-      if (state.clock.getElapsedTime() * 1000 - lastShootTime.current > SHOOT_COOLDOWN) {
+      if (weaponType === 'main' && state.clock.getElapsedTime() * 1000 - lastShootTime.current > SHOOT_COOLDOWN) {
         lastShootTime.current = state.clock.getElapsedTime() * 1000;
         canShoot.current = false;
         
@@ -365,7 +427,13 @@ export default function Tank({
       receiveShadow
     >
       <TankBody />
-      <TankTurret ref={turretRef} muzzleFlash={muzzleFlash} cannonRecoil={cannonRecoil} />
+      <TankTurret 
+        ref={turretRef} 
+        muzzleFlash={weaponType === 'main' ? muzzleFlash : false}
+        cannonRecoil={cannonRecoil}
+        machineGunActive={weaponType === 'machineGun'}
+        isFiring={weaponType === 'machineGun' && shoot && isMachineGunFiring} // Only show effects when actually firing
+      />
     </group>
   );
 } 
